@@ -1,21 +1,22 @@
-﻿using Life;
+﻿using System;
+using Life;
 using Life.UI;
 using Life.Network;
-using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using FoxLottery.DB;
 using System.Text.RegularExpressions;
+using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace FoxLottery
 {
     public class FoxLottery : Plugin
     {
         public FoxLottery(IGameAPI api) : base(api)
-        { }
+        {
+        }
 
         public override void OnPluginInit()
         {
@@ -28,81 +29,143 @@ namespace FoxLottery
 
         private void SetupCommand()
         {
-            SChatCommand commandCreateLottery = new SChatCommand("/manageLottery", "Create your lottery", "/manageLottery", (player, args) =>
-            {
-                PanelCreateManageLottery(player);
-            });
+            var commandCreateLottery = new SChatCommand("/gestionLotterie", "Create your lottery", "/manageLottery",
+                (player, args) => { PanelCreateManageLottery(player); });
             commandCreateLottery.Register();
 
-            SChatCommand commandSellticket = new SChatCommand("/sellTicket", "", "/sellTicket", (player, args) =>
-            {
-                GiveTicketClosestPlayer(player);
-            });
-            commandSellticket.Register();
+            var commandSellTicket = new SChatCommand("/vendreTicket", "", "/sellTicket",
+                (player, args) => { GiveTicketClosestPlayer(player); });
+            commandSellTicket.Register();
 
-            SChatCommand commandViewTicket = new SChatCommand("/mesTickets", "", "/mesTickets", (player, args) =>
-            {
-                GetTickets(player);
-            });
+            var commandViewTicket =
+                new SChatCommand("/mesTickets", "", "/mesTickets", (player, args) => { GetTickets(player); });
             commandViewTicket.Register();
         }
 
-        private static async Task GetTickets(Player player)
+        private static async void GetTickets(Player player)
         {
-            List<TicketModel> ticketModels = await DBManager.GetTickets(player.character.Id);
-            UIPanel listTickets = new UIPanel("Mes tickets", UIPanel.PanelType.Tab);
-            listTickets.AddButton("Fermer", (ui) => { player.ClosePanel(ui); });
-            foreach(var ticket in ticketModels)
+            var allLotteryOpened = await DBManager.GetLotterys();
+
+            var listTickets = new UIPanel("Mes tickets", UIPanel.PanelType.Tab);
+            listTickets.AddButton("Fermer", player.ClosePanel);
+            listTickets.AddButton("Selectionner", (ui) => { ui.SelectTab(); });
+
+            // foreach in all the opened lottery
+            foreach (var lottery in allLotteryOpened)
             {
-                listTickets.AddTabLine("Numero : " + ticket.Numero, null);
+                // i fetch all the tickets from the player and the lottery
+                var ticketModels = await DBManager.GetTickets(player.character.Id, lottery.id);
+
+                if (ticketModels.Count == 0) continue;
+
+                // Every single line of this menu is a society with open lottery
+                listTickets.AddTabLine("Lottery de " + lottery.enterpriseName, (subLottery) =>
+                {
+                    #region menu list ticket for society
+
+                    player.ClosePanel(subLottery);
+                    var panelForTicket = new UIPanel("Ticket de " + lottery.enterpriseName, UIPanel.PanelType.Tab);
+                    panelForTicket.AddButton("Montrer", (showTicket) =>
+                    {
+                        showTicket.SelectTab();
+                        player.ClosePanel(showTicket);
+                    });
+                    panelForTicket.AddButton("Fermer", player.ClosePanel);
+
+                    foreach (var ticket in ticketModels)
+                    {
+                        panelForTicket.AddTabLine("Ticket numéro " + ticket.Numero,
+                            ui => { ShowTicketToPlayer(player, ticket); });
+                    }
+
+                    player.ShowPanelUI(panelForTicket);
+
+                    #endregion
+                });
             }
 
             player.ShowPanelUI(listTickets);
         }
 
-        private async void GiveTicketClosestPlayer(Player player)
+        private static void ShowTicketToPlayer(Player player, TicketModel ticket)
         {
             var closestPlayer = player.GetClosestPlayer();
-
-            if (player.HasBiz())
+            if (closestPlayer != null)
             {
-                if (player.biz.Id != 0)
-                {
-                    var LotteryOpened = await DBManager.GetLottery(player.biz.Id);
+                var ticketShowing = new UIPanel("Ticket de " + player.GetFullName(), UIPanel.PanelType.Text);
+                ticketShowing.SetText("\nTicket numéro : " + ticket.Numero);
+                ticketShowing.AddButton("Fermer", closestPlayer.ClosePanel);
 
-                    if (LotteryOpened != null)
-                    {
-                        AskNumberTicket(player, closestPlayer, LotteryOpened);
-                    } else
-                    {
-                        player.Notify("Lotterie", "Aucune lotterie n'est organiser par votre entreprise", NotificationManager.Type.Error);
-                    }
-                }
+                closestPlayer.ShowPanelUI(ticketShowing);
+                player.Notify("Lotterie", "Vous avez montré votre ticket à la personne à coté de vous.");
+            }
+            else
+            {
+                player.Notify("Lotterie", "Vous n'avez personne à qui montrer votre ticket.");
             }
         }
 
-        private void AskNumberTicket(Player player, Player closestPlayer, LotteryModel lottery)
+        private static async void GiveTicketClosestPlayer(Player player)
         {
-            UIPanel panel = new UIPanel("Entrez un numéro de ticket", UIPanel.PanelType.Input);
-            panel.inputPlaceholder = "Entrez un numéro de ticket compris entre 1 et 1000";
+            var closestPlayer = player.GetClosestPlayer();
+            if (closestPlayer != null)
+            {
+                if (!player.HasBiz()) return;
+                if (player.biz.Id == 0) return;
+                var lotteryOpened = await DBManager.GetLottery(player.biz.Id);
+
+                if (lotteryOpened != null)
+                {
+                    if (lotteryOpened.status == 2)
+                    {
+                        player.Notify("Lotterie", "Vous ne pouvez plus vendre de ticket, la lotterie est terminé");
+                    }
+                    else
+                    {
+                        AskNumberTicket(player, closestPlayer, lotteryOpened);
+                    }
+                }
+                else
+                {
+                    player.Notify("Lotterie", "Aucune lotterie n'est organiser par votre entreprise",
+                        NotificationManager.Type.Error);
+                }
+            }
+            else
+
+            {
+                player.Notify("Lotterie", "Personne n'est prêt de vous.");
+            }
+        }
+
+        private static void AskNumberTicket(Player player, Player closestPlayer, LotteryModel lottery)
+        {
+            var panel = new UIPanel("Entrez un numéro de ticket", UIPanel.PanelType.Input)
+            {
+                inputPlaceholder = "Numéro de ticket compris entre 1 et 1000"
+            };
             panel.AddButton("Valider", (ui) =>
             {
-                string pattern = "^(?:[1-9]\\d{0,2}|1000)$";
-                Regex regex = new Regex(pattern);
+                const string pattern = "^(?:[1-9]\\d{0,2}|1000)$";
+                var regex = new Regex(pattern);
                 if (regex.IsMatch(ui.inputText))
                 {
-                    TicketModel newTicket = new TicketModel();
-                    newTicket.idLottery = lottery.id;
-                    newTicket.idCharacter = closestPlayer.character.Id;
-                    newTicket.Numero = int.Parse(ui.inputText);
+                    var newTicket = new TicketModel
+                    {
+                        idLottery = lottery.id,
+                        idCharacter = closestPlayer.character.Id,
+                        Numero = int.Parse(ui.inputText)
+                    };
 
                     DBManager.RegisterTicketForLottery(newTicket);
 
                     player.Notify("Lotterie", "Vous avez bien donner un ticket à " + closestPlayer.GetFullName());
-                    closestPlayer.Notify("Lotterie", "Votre ticket a bien été pris en compte", NotificationManager.Type.Success);
+                    closestPlayer.Notify("Lotterie", "Votre ticket a bien été pris en compte",
+                        NotificationManager.Type.Success);
 
                     closestPlayer.ClosePanel(ui);
-                } else
+                }
+                else
                 {
                     closestPlayer.Notify("Lotterie", "Le numéro doit être compris entre 1 et 1000");
                 }
@@ -114,115 +177,116 @@ namespace FoxLottery
             });
 
             closestPlayer.ShowPanelUI(panel);
+            player.Notify("Lotterie", "Votre demande de numéro a été envoyé à la personne devant vous.");
         }
 
         private async void PanelCreateManageLottery(Player player)
         {
-            UIPanel lotteryPanel = new UIPanel("Lotterie System", UIPanel.PanelType.Tab)
-                .AddButton("Fermer", (ui) =>
-                {
-                    player.ClosePanel(ui);
-                })
+            var lotteryPanel = new UIPanel("Lotterie System", UIPanel.PanelType.Tab)
+                .AddButton("Fermer", player.ClosePanel)
                 .AddButton("Selectionner", (ui) =>
                 {
                     ui.SelectTab();
+                    player.ClosePanel(ui);
                 });
 
             if (player.HasBiz())
             {
-                if (player.biz.Id != 0)
+                if (player.biz.Id == 0) return;
+                var lotteryOpened = await DBManager.GetLottery(player.biz.Id);
+                if (lotteryOpened != null)
                 {
-                    var LotteryOpened = await DBManager.GetLottery(player.biz.Id);
-                    if (LotteryOpened != null)
-                    {
-                        ManageLottery(player, LotteryOpened, lotteryPanel);
-                    }
-                    else
-                    {
-                        CreateLottery(player, lotteryPanel);
-                    }
+                    lotteryOpened.NombreParticipant = await DBManager.GetCountTicketsForLottery(lotteryOpened.id);
+                    ManageLottery(player, lotteryOpened, lotteryPanel);
                 }
+                else
+                {
+                    CreateLottery(player, lotteryPanel);
+                }
+
+                player.ShowPanelUI(lotteryPanel);
             }
             else
             {
-                player.Notify("Erreur de commande", "Vous n'avez pas d'enterprise afin de créer une lotterie", NotificationManager.Type.Error);
+                player.Notify("Erreur de commande", "Vous n'avez pas d'enterprise afin de créer une lotterie",
+                    NotificationManager.Type.Error);
             }
         }
 
-        private void CreateLottery(Player player, UIPanel panel)
+        private static void CreateLottery(Player player, UIPanel panel)
         {
             panel.AddTabLine("Créer une lotterie", (ui) =>
             {
-                player.ClosePanel(ui);
+                var montantAGagner = 0;
 
-                int montantAGagner = 0;
-
-                UIPanel panelMontantLotterie = new UIPanel("Montant à gagner", UIPanel.PanelType.Input)
-                .AddButton("Valider", (subUI) =>
-                {
-                    montantAGagner = int.Parse(subUI.inputText);
-                    if (CheckFound(player, montantAGagner))
+                var panelMontantLotterie = new UIPanel("Montant à gagner", UIPanel.PanelType.Input)
+                    .AddButton("Valider", (subUI) =>
                     {
-                        player.ClosePanel(subUI);
-                        UIPanel prixBillet = new UIPanel("Montant du ticket", UIPanel.PanelType.Input);
-                        prixBillet.inputPlaceholder = "100€, 200€";
-                        prixBillet.AddButton("Valider", (btnValidatePrix) =>
+                        montantAGagner = int.Parse(subUI.inputText);
+                        if (CheckFound(player, montantAGagner))
                         {
-                            DBManager.RegisterLottery((uint)player.biz.Id, montantAGagner, float.Parse(btnValidatePrix.inputText));
-                            player.Notify("Lotterie ajouté", "Votre lotterie a bien été créer.", NotificationManager.Type.Success);
-                            player.ClosePanel(btnValidatePrix);
-                        });
-                        prixBillet.AddButton("Fermer", (btnClosePrix) =>
-                        {
-                            player.ClosePanel(btnClosePrix);
-                        });
+                            player.ClosePanel(subUI);
+                            var prixBillet = new UIPanel("Montant du ticket", UIPanel.PanelType.Input)
+                            {
+                                inputPlaceholder = "100€, 200€"
+                            };
+                            prixBillet.AddButton("Valider", (btnValidatePrix) =>
+                            {
+                                DBManager.RegisterLottery((uint)player.biz.Id, player.biz.BizName, montantAGagner,
+                                    float.Parse(btnValidatePrix.inputText));
+                                player.Notify("Lotterie ajouté", "Votre lotterie a bien été créer.",
+                                    NotificationManager.Type.Success);
+                                player.ClosePanel(btnValidatePrix);
+                            });
+                            prixBillet.AddButton("Fermer", player.ClosePanel);
 
-                        player.ShowPanelUI(prixBillet);
-                    }
-                })
-                .AddButton("Fermer", (subUI) =>
-                {
-                    player.ClosePanel(subUI);
-                });
+                            player.ShowPanelUI(prixBillet);
+                        }
+                        else
+                        {
+                            player.Notify("Lotterie", "Vous n'avez pas les fonds au seins de votre entreprise");
+                        }
+                    })
+                    .AddButton("Fermer", player.ClosePanel);
                 panelMontantLotterie.inputPlaceholder = "Entrer le montant à gagner";
 
                 player.ShowPanelUI(panelMontantLotterie);
             });
-
-            player.ShowPanelUI(panel);
         }
 
-        private bool CheckFound(Player player, int montantAGagner)
+        private static bool CheckFound(Player player, int montantAGagner)
         {
-            if (player.HasBiz()) { return player.biz.Bank >= montantAGagner; }
+            if (player.HasBiz())
+            {
+                return player.biz.Bank >= montantAGagner;
+            }
+
             return false;
         }
 
-        private async void ManageLottery(Player player, LotteryModel lotteryOpened, UIPanel panel)
+        private static async void ManageLottery(Player player, LotteryModel lotteryOpened, UIPanel panel)
         {
-            panel.AddTabLine("Montant à gagner : " + lotteryOpened.montant + "€", (ui) =>
-            {
+            panel.AddTabLine("Montant à gagner : " + lotteryOpened.montant + "€", (ui) => { });
 
-            });
+            panel.AddTabLine("Prix du ticket : " + lotteryOpened.price + "€", (ui) => { });
 
-
-            panel.AddTabLine("Prix du ticket : " + lotteryOpened.price + "€", (ui) =>
-            {
-
-            });
-
-            var nbParticipant = await DBManager.GetCountTicketsForLottery(lotteryOpened.id);
-            panel.AddTabLine("Nombre de participant : " + nbParticipant, (ui) =>
-            {
-
-            });
-
-            panel.AddTabLine("Tirer un nombre au hasard", (ui) => {
-
-            });
+            panel.AddTabLine("Nombre de participant : " + lotteryOpened.NombreParticipant, (ui) => { });
 
             if (lotteryOpened.status != 2)
             {
+                panel.AddTabLine("Tirer un nombre au hasard", (ui) =>
+                {
+                    var numeroTire = Random.Range(1, 1001);
+                    lotteryOpened.numSortie = numeroTire;
+                    lotteryOpened.status = 2;
+                    DBManager.UpdateAlarm(lotteryOpened);
+                    player.ClosePanel(ui);
+                    var fenResult = new UIPanel("Resultat du tirage", UIPanel.PanelType.Text);
+                    fenResult.AddButton("Fermer", player.ClosePanel);
+                    fenResult.SetText("\nNuméro gagnant : " + numeroTire);
+                    player.ShowPanelUI(fenResult);
+                });
+
                 panel.AddTabLine("Annuler la lotterie", (ui) =>
                 {
                     lotteryOpened.status = 1;
@@ -231,7 +295,15 @@ namespace FoxLottery
                 });
             }
 
-            player.ShowPanelUI(panel);
+            if (lotteryOpened.status == 2)
+            {
+                panel.AddTabLine("Fermer la lotterie", ui =>
+                {
+                    lotteryOpened.status = 1;
+                    DBManager.UpdateAlarm(lotteryOpened);
+                    player.ClosePanel(ui);
+                });
+            }
         }
 
         private async void InitDataBase()

@@ -1,5 +1,6 @@
 ﻿using FoxLottery.DB;
 using Life;
+using RTG;
 using SQLite;
 using System;
 using System.Collections.Generic;
@@ -25,11 +26,12 @@ namespace FoxLottery
             return true;
         }
 
-        public async static void RegisterLottery(uint bizID, int montant, float price)
+        public async static void RegisterLottery(uint bizID, string nameBiz, int montant, float price)
         {
             LotteryModel lotteryModel = new LotteryModel()
             {
                 bizID = (int)bizID,
+                enterpriseName = nameBiz,
                 montant = montant,
                 price = price,
                 status = 0
@@ -68,11 +70,18 @@ namespace FoxLottery
             return await asyncTableQuery.CountAsync((TicketModel t) => t.idLottery == idLottery);
         }
 
-        public static async Task<List<TicketModel>> GetTickets(int idChar)
+        public static async Task<List<TicketModel>> GetTickets(int idChar, int idLottery)
         {
             AsyncTableQuery<TicketModel> asyncTableQuery = DBManager.db.Table<TicketModel>();
-            List<TicketModel> tickets =  await asyncTableQuery.Where((TicketModel t) => t.idCharacter == idChar).ToListAsync();
+            List<TicketModel> tickets =  await asyncTableQuery.Where((TicketModel t) => t.idCharacter == idChar && t.idLottery == idLottery).ToListAsync();
             return tickets;
+        }
+
+        public static async Task<List<LotteryModel>> GetLotterys()
+        {
+            AsyncTableQuery<LotteryModel> asyncTableQuery = DBManager.db.Table<LotteryModel>();
+            List<LotteryModel> lotterys = await asyncTableQuery.Where((LotteryModel l) => l.status != 1).ToListAsync();
+            return lotterys;
         }
     }
 }

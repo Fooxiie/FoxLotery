@@ -9,21 +9,20 @@ namespace FoxLottery.DB
 {
     public class LotteryModel
     {
-        [AutoIncrement]
-        [PrimaryKey]
-        public int id
-        { get; set; }
+        [AutoIncrement] [PrimaryKey] public int id { get; set; }
 
-        public int montant
-        { get; set; }
+        public int montant { get; set; }
 
-        public int bizID
-        { get; set; }
+        public string enterpriseName { get; set; }
 
-        public float price
-        { get; set; }
+        public int bizID { get; set; }
 
-        public int status
-        { get; set; }
+        public float price { get; set; }
+
+        public int status { get; set; }
+
+        public int numSortie { get; set; }
+
+        [NonSerialized] public int NombreParticipant;
     }
 }
