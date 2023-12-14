@@ -29,7 +29,7 @@ namespace FoxLottery
 
         private void SetupCommand()
         {
-            var commandCreateLottery = new SChatCommand("/gestionLotterie", "Create your lottery", "/manageLottery",
+            var commandCreateLottery = new SChatCommand("/gestionLoterie", "Create your lottery", "/manageLottery",
                 (player, args) => { PanelCreateManageLottery(player); });
             commandCreateLottery.Register();
 
@@ -97,11 +97,11 @@ namespace FoxLottery
                 ticketShowing.AddButton("Fermer", closestPlayer.ClosePanel);
 
                 closestPlayer.ShowPanelUI(ticketShowing);
-                player.Notify("Lotterie", "Vous avez montré votre ticket à la personne à coté de vous.");
+                player.Notify("Loterie", "Vous avez montré votre ticket à la personne à coté de vous.");
             }
             else
             {
-                player.Notify("Lotterie", "Vous n'avez personne à qui montrer votre ticket.");
+                player.Notify("Loterie", "Vous n'avez personne à qui montrer votre ticket.");
             }
         }
 
@@ -118,7 +118,7 @@ namespace FoxLottery
                 {
                     if (lotteryOpened.status == 2)
                     {
-                        player.Notify("Lotterie", "Vous ne pouvez plus vendre de ticket, la lotterie est terminé");
+                        player.Notify("Loterie", "Vous ne pouvez plus vendre de ticket, la loterie est terminé");
                     }
                     else
                     {
@@ -127,14 +127,14 @@ namespace FoxLottery
                 }
                 else
                 {
-                    player.Notify("Lotterie", "Aucune lotterie n'est organiser par votre entreprise",
+                    player.Notify("Loterie", "Aucune loterie n'est organiser par votre entreprise",
                         NotificationManager.Type.Error);
                 }
             }
             else
 
             {
-                player.Notify("Lotterie", "Personne n'est prêt de vous.");
+                player.Notify("Loterie", "Personne n'est prêt de vous.");
             }
         }
 
@@ -159,30 +159,30 @@ namespace FoxLottery
 
                     DBManager.RegisterTicketForLottery(newTicket);
 
-                    player.Notify("Lotterie", "Vous avez bien donner un ticket à " + closestPlayer.GetFullName());
-                    closestPlayer.Notify("Lotterie", "Votre ticket a bien été pris en compte",
+                    player.Notify("Loterie", "Vous avez bien donner un ticket à " + closestPlayer.GetFullName());
+                    closestPlayer.Notify("Loterie", "Votre ticket a bien été pris en compte",
                         NotificationManager.Type.Success);
 
                     closestPlayer.ClosePanel(ui);
                 }
                 else
                 {
-                    closestPlayer.Notify("Lotterie", "Le numéro doit être compris entre 1 et 1000");
+                    closestPlayer.Notify("Loterie", "Le numéro doit être compris entre 1 et 1000");
                 }
             });
             panel.AddButton("Fermer", (ui) =>
             {
                 closestPlayer.ClosePanel(ui);
-                player.Notify("Lotterie", "La personne n'as pas validé le numéro de son ticket");
+                player.Notify("Loterie", "La personne n'as pas validé le numéro de son ticket");
             });
 
             closestPlayer.ShowPanelUI(panel);
-            player.Notify("Lotterie", "Votre demande de numéro a été envoyé à la personne devant vous.");
+            player.Notify("Loterie", "Votre demande de numéro a été envoyé à la personne devant vous.");
         }
 
         private async void PanelCreateManageLottery(Player player)
         {
-            var lotteryPanel = new UIPanel("Lotterie System", UIPanel.PanelType.Tab)
+            var lotteryPanel = new UIPanel("Loterie System", UIPanel.PanelType.Tab)
                 .AddButton("Fermer", player.ClosePanel)
                 .AddButton("Selectionner", (ui) =>
                 {
@@ -208,14 +208,14 @@ namespace FoxLottery
             }
             else
             {
-                player.Notify("Erreur de commande", "Vous n'avez pas d'enterprise afin de créer une lotterie",
+                player.Notify("Erreur de commande", "Vous n'avez pas d'enterprise afin de créer une loterie",
                     NotificationManager.Type.Error);
             }
         }
 
         private static void CreateLottery(Player player, UIPanel panel)
         {
-            panel.AddTabLine("Créer une lotterie", (ui) =>
+            panel.AddTabLine("Créer une loterie", (ui) =>
             {
                 var montantAGagner = 0;
 
@@ -234,7 +234,7 @@ namespace FoxLottery
                             {
                                 DBManager.RegisterLottery((uint)player.biz.Id, player.biz.BizName, montantAGagner,
                                     float.Parse(btnValidatePrix.inputText));
-                                player.Notify("Lotterie ajouté", "Votre lotterie a bien été créer.",
+                                player.Notify("Loterie ajouté", "Votre loterie a bien été créer.",
                                     NotificationManager.Type.Success);
                                 player.ClosePanel(btnValidatePrix);
                             });
@@ -244,7 +244,7 @@ namespace FoxLottery
                         }
                         else
                         {
-                            player.Notify("Lotterie", "Vous n'avez pas les fonds au seins de votre entreprise");
+                            player.Notify("Loterie", "Vous n'avez pas les fonds au seins de votre entreprise");
                         }
                     })
                     .AddButton("Fermer", player.ClosePanel);
@@ -287,7 +287,7 @@ namespace FoxLottery
                     player.ShowPanelUI(fenResult);
                 });
 
-                panel.AddTabLine("Annuler la lotterie", (ui) =>
+                panel.AddTabLine("Annuler la loterie", (ui) =>
                 {
                     lotteryOpened.status = 1;
                     DBManager.UpdateAlarm(lotteryOpened);
@@ -297,7 +297,7 @@ namespace FoxLottery
 
             if (lotteryOpened.status == 2)
             {
-                panel.AddTabLine("Fermer la lotterie", ui =>
+                panel.AddTabLine("Fermer la loterie", ui =>
                 {
                     lotteryOpened.status = 1;
                     DBManager.UpdateAlarm(lotteryOpened);
