@@ -27,7 +27,7 @@ namespace FoxLottery
             SetupCommand();
         }
 
-        private void SetupCommand()
+        private static void SetupCommand()
         {
             var commandCreateLottery = new SChatCommand("/gestionLoterie", "Create your lottery", "/gestionLoterie",
                 (player, args) => { PanelCreateManageLottery(player); });
@@ -310,7 +310,11 @@ namespace FoxLottery
 
         private async void InitDataBase()
         {
-            await DBManager.Init(Path.Combine(pluginsPath, "FoxLottery/data.db"));
+            if (!Directory.Exists(Path.Combine(pluginsPath, "FoxLottery")))
+            {
+                Directory.CreateDirectory(Path.Combine(pluginsPath, "FoxLottery"));
+            }
+            await DBManager.Init(Path.Combine(pluginsPath, "FoxLottery/data.sqlite"));
         }
     }
 }
