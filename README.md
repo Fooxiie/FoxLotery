@@ -1,4 +1,6 @@
 # FoxLotery
+![image](https://github.com/Fooxiie/FoxLotery/assets/13649585/64e0409f-9956-4880-9292-81219c1a276a)
+
  Busines can create lotery with their funds, choose the price, and the ticket price.
  
 # To contribute and motivate myself:
